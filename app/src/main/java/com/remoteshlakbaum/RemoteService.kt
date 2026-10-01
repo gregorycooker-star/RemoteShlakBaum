@@ -12,13 +12,13 @@ import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 class RemoteService : Service() {
     private val client = OkHttpClient.Builder().connectTimeout(15, TimeUnit.SECONDS).build()
     private val handler by lazy { android.os.Handler(mainLooper) }
     private val endpoint = "https://zkygfwcsarcgjkjbnhwo.supabase.co/functions/v1/remote-command"
-    private val apiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpreWdmd2NzYXJjZ2pramJuaHdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA4NjgxMTUsImV4cCI6MjEwNjQ0NDExNX0.2TK2Uj67TSUI6AQXLF9xXiiE5tszk6wSFjmpHNPb0Mc"
 
     override fun onCreate() {
         super.onCreate()
@@ -28,11 +28,15 @@ class RemoteService : Service() {
         poll()
     }
 
+    private fun sha256(s: String): String = MessageDigest.getInstance("SHA-256").digest(s.toByteArray()).joinToString("") { "%02x".format(it) }
+
     private fun poll() {
         val prefs = getSharedPreferences("remote", MODE_PRIVATE)
         val deviceId = prefs.getString("topic", null) ?: return
-        val body = JSONObject().put("action", "poll").put("deviceId", deviceId).toString().toRequestBody("application/json".toMediaType())
-        val req = Request.Builder().url(endpoint).header("apikey", apiKey).header("Authorization", "Bearer $apiKey").post(body).build()
+        val pin = prefs.getString("pin", "1234") ?: "1234"
+        val routeKey = sha256("$deviceId:$pin")
+        val body = JSONObject().put("action", "poll").put("routeKey", routeKey).toString().toRequestBody("application/json".toMediaType())
+        val req = Request.Builder().url(endpoint).post(body).build()
         client.newCall(req).enqueue(object: Callback {
             override fun onFailure(call: Call, e: java.io.IOException) { schedule() }
             override fun onResponse(call: Call, response: Response) {

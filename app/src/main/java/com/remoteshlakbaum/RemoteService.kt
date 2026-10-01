@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.IBinder
+import android.os.PowerManager
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import okhttp3.*
@@ -19,20 +20,28 @@ class RemoteService : Service() {
     private val client = OkHttpClient.Builder().connectTimeout(15, TimeUnit.SECONDS).build()
     private val handler by lazy { android.os.Handler(mainLooper) }
     private val endpoint = "https://zkygfwcsarcgjkjbnhwo.supabase.co/functions/v1/remote-command"
+    private var wakeLock: PowerManager.WakeLock? = null
 
     override fun onCreate() {
         super.onCreate()
         val channel = "remote_shlakbaum"
         if (android.os.Build.VERSION.SDK_INT >= 26) getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel(channel, "Remote ShlakBaum", NotificationManager.IMPORTANCE_LOW))
         startForeground(7, NotificationCompat.Builder(this, channel).setSmallIcon(android.R.drawable.sym_call_incoming).setContentTitle("Remote ShlakBaum").setContentText("Удалённое управление активно").setOngoing(true).build())
+        val pm = getSystemService(POWER_SERVICE) as PowerManager
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "RemoteShlakBaum:poll").apply {
+            setReferenceCounted(false)
+            acquire()
+        }
         poll()
     }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
 
     private fun sha256(s: String): String = MessageDigest.getInstance("SHA-256").digest(s.toByteArray()).joinToString("") { "%02x".format(it) }
 
     private fun poll() {
         val prefs = getSharedPreferences("remote", MODE_PRIVATE)
-        val deviceId = prefs.getString("topic", null) ?: return
+        val deviceId = prefs.getString("topic", null) ?: run { schedule(); return }
         val pin = prefs.getString("pin", "1234") ?: "1234"
         val routeKey = sha256("$deviceId:$pin")
         val body = JSONObject().put("action", "poll").put("routeKey", routeKey).toString().toRequestBody("application/json".toMediaType())
@@ -64,6 +73,10 @@ class RemoteService : Service() {
         try { startActivity(intent) } catch (_: Exception) { }
     }
 
-    override fun onDestroy() { handler.removeCallbacksAndMessages(null); super.onDestroy() }
+    override fun onDestroy() {
+        handler.removeCallbacksAndMessages(null)
+        if (wakeLock?.isHeld == true) wakeLock?.release()
+        super.onDestroy()
+    }
     override fun onBind(intent: Intent?): IBinder? = null
 }

@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Remote ShlakBaum</title>
+
+<style>
+body {
+  font-family: -apple-system,BlinkMacSystemFont,sans-serif;
+  background:#f2f2f7;
+  margin:0;
+  padding:22px;
+}
+.card {
+  max-width:520px;
+  margin:auto;
+  background:white;
+  padding:22px;
+  border-radius:20px;
+}
+h1 { font-size:28px; }
+input,button {
+  width:100%;
+  box-sizing:border-box;
+  padding:16px;
+  margin:7px 0;
+  font-size:18px;
+  border-radius:12px;
+}
+input { border:1px solid #ccc; }
+button {
+  border:0;
+  background:#007aff;
+  color:white;
+  font-weight:bold;
+}
+#status {
+  text-align:center;
+  padding:14px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="card">
+
+<h1>Remote ShlakBaum</h1>
+
+<input id="device" placeholder="Код Samsung">
+
+<input id="pin"
+       type="password"
+       inputmode="numeric"
+       placeholder="PIN">
+
+<div id="buttons"></div>
+
+<div id="status"></div>
+
+</div>
+
+<script>
+
+const endpoint =
+"https://zkygfwcsarcgjkjbnhwo.supabase.co/functions/v1/remote-command";
+
+const device = document.getElementById("device");
+const pin = document.getElementById("pin");
+const buttons = document.getElementById("buttons");
+const status = document.getElementById("status");
+
+device.value = localStorage.rsbDevice || "";
+
+async function sha256(text) {
+
+  const data =
+    new TextEncoder().encode(text);
+
+  const hash =
+    await crypto.subtle.digest("SHA-256",data);
+
+  return [...new Uint8Array(hash)]
+    .map(x=>x.toString(16).padStart(2,"0"))
+    .join("");
+}
+
+async function call(slot) {
+
+  const id = device.value.trim();
+  const p = pin.value;
+
+  if(!id || p.length < 4) {
+    status.textContent =
+      "Введите код Samsung и PIN";
+    return;
+  }
+
+  localStorage.rsbDevice = id;
+
+  const routeKey =
+    await sha256(id + ":" + p);
+
+  status.textContent =
+    "Отправляю команду…";
+
+  try {
+
+    const response =
+      await fetch(endpoint,{
+        method:"POST",
+        headers:{
+          "content-type":"application/json"
+        },
+        body:JSON.stringify({
+          action:"send",
+          routeKey:routeKey,
+          slot:slot
+        })
+      });
+
+    const result =
+      await response.json();
+
+    if(result.ok) {
+      status.textContent =
+        "Команда отправлена ✓";
+    } else {
+      status.textContent =
+        "Ошибка отправки";
+    }
+
+  } catch(e) {
+
+    status.textContent =
+      "Нет связи с сервером";
+  }
+}
+
+for(let i=1;i<=10;i++) {
+
+  const button =
+    document.createElement("button");
+
+  button.textContent =
+    "ПОЗВОНИТЬ " + i;
+
+  button.onclick =
+    ()=>call(i);
+
+  buttons.appendChild(button);
+}
+
+</script>
+
+</body>
+</html>

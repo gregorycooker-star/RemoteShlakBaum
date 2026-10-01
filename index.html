@@ -2,157 +2,27 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#f2f2f7">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="ShlakBaum">
+<link rel="manifest" href="manifest.webmanifest">
 <title>Remote ShlakBaum</title>
-
 <style>
-body {
-  font-family: -apple-system,BlinkMacSystemFont,sans-serif;
-  background:#f2f2f7;
-  margin:0;
-  padding:22px;
-}
-.card {
-  max-width:520px;
-  margin:auto;
-  background:white;
-  padding:22px;
-  border-radius:20px;
-}
-h1 { font-size:28px; }
-input,button {
-  width:100%;
-  box-sizing:border-box;
-  padding:16px;
-  margin:7px 0;
-  font-size:18px;
-  border-radius:12px;
-}
-input { border:1px solid #ccc; }
-button {
-  border:0;
-  background:#007aff;
-  color:white;
-  font-weight:bold;
-}
-#status {
-  text-align:center;
-  padding:14px;
-}
+*{box-sizing:border-box} body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f2f2f7;margin:0;padding:max(22px,env(safe-area-inset-top)) 18px max(22px,env(safe-area-inset-bottom));color:#111}.card{max-width:520px;margin:auto;background:#fff;padding:22px;border-radius:24px;box-shadow:0 8px 30px rgba(0,0,0,.06)}h1{font-size:30px;margin:8px 0 20px}.settings{display:grid;gap:10px;margin-bottom:14px}input,button{width:100%;font:inherit;font-size:18px;border-radius:14px;padding:16px}input{border:1px solid #d1d1d6;background:#fff}button{border:0;background:#007aff;color:#fff;font-weight:700;min-height:58px}.call{margin:9px 0}.secondary{background:#e9e9ee;color:#111}.hidden{display:none}#status{text-align:center;min-height:42px;padding:12px;font-weight:600}.small{font-size:14px;color:#6e6e73;text-align:center;margin-top:8px}.row{display:flex;gap:10px}.row button{flex:1}
 </style>
 </head>
-
-<body>
-
-<div class="card">
-
-<h1>Remote ShlakBaum</h1>
-
-<input id="device" placeholder="Код Samsung">
-
-<input id="pin"
-       type="password"
-       inputmode="numeric"
-       placeholder="PIN">
-
-<div id="buttons"></div>
-
-<div id="status"></div>
-
-</div>
-
+<body><main class="card"><h1>Remote ShlakBaum</h1><section id="setup" class="settings"><input id="device" autocomplete="off" autocapitalize="off" placeholder="Код Samsung"><input id="pin" type="password" inputmode="numeric" autocomplete="off" placeholder="PIN"><button id="save">СОХРАНИТЬ НАСТРОЙКИ</button></section><div class="row"><button id="settingsBtn" class="secondary">НАСТРОЙКИ</button></div><div id="buttons"></div><div id="status"></div><div class="small">Команда отправляется на ваш Samsung через защищённый ключ устройства и PIN.</div></main>
 <script>
-
-const endpoint =
-"https://zkygfwcsarcgjkjbnhwo.supabase.co/functions/v1/remote-command";
-
-const device = document.getElementById("device");
-const pin = document.getElementById("pin");
-const buttons = document.getElementById("buttons");
-const status = document.getElementById("status");
-
-device.value = localStorage.rsbDevice || "";
-
-async function sha256(text) {
-
-  const data =
-    new TextEncoder().encode(text);
-
-  const hash =
-    await crypto.subtle.digest("SHA-256",data);
-
-  return [...new Uint8Array(hash)]
-    .map(x=>x.toString(16).padStart(2,"0"))
-    .join("");
-}
-
-async function call(slot) {
-
-  const id = device.value.trim();
-  const p = pin.value;
-
-  if(!id || p.length < 4) {
-    status.textContent =
-      "Введите код Samsung и PIN";
-    return;
-  }
-
-  localStorage.rsbDevice = id;
-
-  const routeKey =
-    await sha256(id + ":" + p);
-
-  status.textContent =
-    "Отправляю команду…";
-
-  try {
-
-    const response =
-      await fetch(endpoint,{
-        method:"POST",
-        headers:{
-          "content-type":"application/json"
-        },
-        body:JSON.stringify({
-          action:"send",
-          routeKey:routeKey,
-          slot:slot
-        })
-      });
-
-    const result =
-      await response.json();
-
-    if(result.ok) {
-      status.textContent =
-        "Команда отправлена ✓";
-    } else {
-      status.textContent =
-        "Ошибка отправки";
-    }
-
-  } catch(e) {
-
-    status.textContent =
-      "Нет связи с сервером";
-  }
-}
-
-for(let i=1;i<=10;i++) {
-
-  const button =
-    document.createElement("button");
-
-  button.textContent =
-    "ПОЗВОНИТЬ " + i;
-
-  button.onclick =
-    ()=>call(i);
-
-  buttons.appendChild(button);
-}
-
-</script>
-
-</body>
-</html>
+const endpoint='https://zkygfwcsarcgjkjbnhwo.supabase.co/functions/v1/remote-command';
+const device=document.getElementById('device'),pin=document.getElementById('pin'),buttons=document.getElementById('buttons'),status=document.getElementById('status'),setup=document.getElementById('setup');
+device.value=localStorage.rsbDevice||''; pin.value=localStorage.rsbPin||'';
+function refresh(){setup.classList.toggle('hidden',!!(localStorage.rsbDevice&&localStorage.rsbPin));}
+document.getElementById('save').onclick=()=>{if(!device.value.trim()||pin.value.length<4){status.textContent='Введите код Samsung и PIN';return;}localStorage.rsbDevice=device.value.trim();localStorage.rsbPin=pin.value;status.textContent='Настройки сохранены ✓';refresh();};
+document.getElementById('settingsBtn').onclick=()=>{setup.classList.remove('hidden');device.value=localStorage.rsbDevice||'';pin.value=localStorage.rsbPin||'';};
+async function sha256(text){const data=new TextEncoder().encode(text);const hash=await crypto.subtle.digest('SHA-256',data);return [...new Uint8Array(hash)].map(x=>x.toString(16).padStart(2,'0')).join('');}
+async function call(slot){const id=localStorage.rsbDevice||device.value.trim(),p=localStorage.rsbPin||pin.value;if(!id||p.length<4){status.textContent='Сначала сохраните настройки';setup.classList.remove('hidden');return;}status.textContent='Отправляю команду…';try{const routeKey=await sha256(id+':'+p);const response=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'send',routeKey,slot})});const result=await response.json();status.textContent=result.ok?'Команда отправлена ✓':'Ошибка отправки';}catch(e){status.textContent='Нет связи с сервером';}}
+for(let i=1;i<=10;i++){const b=document.createElement('button');b.className='call';b.textContent='ПОЗВОНИТЬ '+i;b.onclick=()=>call(i);buttons.appendChild(b);}refresh();
+if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+</script></body></html>
